@@ -122,6 +122,9 @@ int my_free(unsigned int addr) {
 	unsigned int newAddr = addr - (msize() / 9);
 	int byte = newAddr / 8;
 	int bit = newAddr % 8;
+	if ((mread(byte) & pow2(bit)) == 0) {
+		return FAIL;
+	}
 	if (bit == 0 && byte != 0) {
 		bit = 7;
 		byte = byte - 1;
