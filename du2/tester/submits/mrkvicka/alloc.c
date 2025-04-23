@@ -119,6 +119,7 @@ int my_alloc(unsigned int size) {
  */
 
 int my_free(unsigned int addr) {
+	if (addr < msize() / 9 || addr > msize()) return FAIL;
 	unsigned int newAddr = addr - (msize() / 9);
 	int byte = newAddr / 8;
 	int bit = newAddr % 8;
