@@ -54,6 +54,7 @@ int my_alloc(unsigned int size) {
 		int currentSize = 0;
 		int startingBit = 0;
 		int startingByte = 0;
+		int spaceNeeded = size;
 
 	/* kazdemu bitu z prvych 1/9 msize() bytov je priradeny jeden byte s datami*/
 	/*prvych 1/9 bytov representuje ci ich priradene byte su obsadene*/
@@ -63,7 +64,7 @@ int my_alloc(unsigned int size) {
 		if (flags == 0) currentSize += 8;
 		else {
 			for (int k = 0; k < 8; k++) {
-				if (currentSize > size + 1) break;
+				if (currentSize > spaceNeeded) break;
 				currentSize++;
 				if (flags % 2 != 0) {
 					if (k == 6) {
@@ -77,11 +78,12 @@ int my_alloc(unsigned int size) {
 						startingByte = i;
 					}
 					currentSize = 0;
+					spaceNeeded = size + 1;
 				}
 				flags /= 2;
 			}
 		}
-		if (currentSize > size + 1) {
+		if (currentSize > spaceNeeded) {
 			if (startingBit + size <= 8) {
 				int occupancy = (pow2(startingBit + size) - 1) - (pow2(startingBit) - 1);
 				mwrite(startingByte, mread(startingByte) | occupancy);
