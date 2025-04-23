@@ -1,9 +1,7 @@
 
 name: Manual Test Run
 
-on:
-  workflow_dispatch:  
-
+on: 
   workflow_dispatch:
 
 
