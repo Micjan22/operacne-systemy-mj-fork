@@ -23,7 +23,19 @@
  * na 0.
  */
 void my_init(void) {
+
 	return;
+}
+
+int pow2(int b) {
+	if (b < 0) {
+		return 0;
+	}
+	int res = 1;
+	for (int i = 0; i < b; i++) {
+		res *= 2;
+	}
+	return res;
 }
 
 /**
@@ -39,15 +51,63 @@ int my_alloc(unsigned int size) {
 	if (size >= msize() - 1)
 		return FAIL;
 
-	/* Pamat uz bola alokovana */
-	if (mread(0) == 1)
-		return FAIL;
+		int currentSize = 0;
+		int startingBit = 0;
+		int startingByte = 0;
+		int spaceNeeded = size;
 
-	/* Vsetko je OK, mozeme splnit poziadavku. Do 0teho bajtu si poznacime, ze
-	 * pamat je obsadena a vratime adresu prveho bajtu novo alokovanej pamate
-	 */
-	mwrite(0, 1);
-	return 1;
+	/* kazdemu bitu z prvych 1/9 msize() bytov je priradeny jeden byte s datami*/
+	/*prvych 1/9 bytov representuje ci ich priradene byte su obsadene*/
+	/*medzi kazdymi dvoma obsadenymi blokmi je jeden byte volny*/
+	for (unsigned int i = 0; i < msize() / 9; i++) {
+		uint8_t flags = mread(i);
+		if (flags == 0) currentSize += 8;
+		else {
+			for (int k = 0; k < 8; k++) {
+				if (currentSize > spaceNeeded) break;
+				currentSize++;
+				if (flags % 2 != 0) {
+					if (k == 6) {
+						startingBit = 0;
+						startingByte = i + 1;
+					} else if (k == 7) {
+						startingBit = 1;
+						startingByte = i + 1;
+					} else {
+						startingBit = k + 2;
+						startingByte = i;
+					}
+					currentSize = 0;
+					spaceNeeded = size + 1;
+				}
+				flags /= 2;
+			}
+		}
+		if (currentSize > spaceNeeded) {
+			if (startingBit + size <= 8) {
+				int occupancy = (pow2(startingBit + size) - 1) - (pow2(startingBit) - 1);
+				mwrite(startingByte, mread(startingByte) | occupancy);
+			} else {
+				int inFirstByte = 8 - startingBit;
+				int toWrite = size - inFirstByte;
+				int occupancy = 255 - (pow2(startingBit) - 1);
+				mwrite(startingByte, mread(startingByte) | occupancy);
+				for (int j = 1; j <= toWrite / 8; j++) {
+					mwrite(startingByte + j, 255);
+				}
+				occupancy = pow2((toWrite % 8)) - 1;
+				int currentPosition = startingByte + (toWrite / 8) + 1;
+				mwrite(currentPosition, mread(currentPosition) | occupancy);
+			}
+			int start = (msize() / 9) + startingByte * 8 + startingBit;
+			if (start + size > msize()) {
+				return FAIL;
+			} else {
+				return start;
+			}
+		}
+	}
+	return FAIL;
 }
 
 /**
@@ -59,16 +119,53 @@ int my_alloc(unsigned int size) {
  */
 
 int my_free(unsigned int addr) {
-
-	/* Adresa nie je platnym smernikom, ktory mohol vratit my_alloc */
-	if (addr != 1)
+	unsigned int newAddr = addr - (msize() / 9);
+	int byte = newAddr / 8;
+	int bit = newAddr % 8;
+	if (bit == 0 && byte != 0) {
+		bit = 7;
+		byte = byte - 1;
+	} else {
+		bit--;
+	}
+	uint8_t flag = mread(byte);
+	if (((flag & (pow2(bit))) == 0) || bit == -1) {
+		if (bit == 7) {
+			bit = 0;
+			byte = byte + 1;
+		} else {
+			bit++;
+		}
+		int possition = 0;
+		for (int i = 0; i < bit; i++) {
+			flag/=2;
+		}
+		for (int i = bit; i < 8; i++) {
+			if (flag % 2 == 0) {
+				mwrite(byte, mread(byte) & (255 - (pow2(i + 1) - 1) + pow2(bit) - 1));
+				return OK;
+			}
+			flag /= 2;
+		}
+		mwrite(byte, mread(byte) & (pow2(bit) - 1));
+		int i = 1;
+		flag = mread(byte + i);
+		while (flag == 255) {
+		
+			mwrite(byte + i, 0);
+			i++;
+			if (byte + i >= (msize() / 9)) return OK;
+			flag = mread(byte + i);
+		}
+		for (int j = 0; j < 8; j++) {
+			if (flag % 2 == 0) {
+				mwrite(byte + i, mread(byte + i) & (255 - (pow2(j) - 1)));
+				return OK;
+			}
+			flag /= 2;
+		}
 		return FAIL;
-
-	/* Nie je alokovana ziadna pamat, nemozeme ju teda uvolnit */
-	if (mread(0) != 1)
+	} else {
 		return FAIL;
-
-	/* Vsetko je OK, mozeme uvolnit pamat */
-	mwrite(0, 0);
-	return OK;
+	}
 }
